@@ -26,6 +26,13 @@ const downloadBtn = document.getElementById("downloadBtn");
 const clearBtn = document.getElementById("clearBtn");
 const personaSelect = document.getElementById("personaSelect");
 const personaDescription = document.getElementById("personaDescription");
+const fileInput = document.getElementById("fileInput");
+const attachBtn = document.getElementById("attachBtn");
+const attachStatus = document.getElementById("attachStatus");
+const attachedDoc = document.getElementById("attachedDoc");
+const attachedDocName = document.getElementById("attachedDocName");
+const attachedDocMeta = document.getElementById("attachedDocMeta");
+const removeDocBtn = document.getElementById("removeDocBtn");
 const ctx2d = canvas.getContext("2d");
 
 // Model name is served from /api/config so it lives in one place
@@ -77,6 +84,77 @@ personaSelect.addEventListener("change", () => {
     selectedPersonaId = personaSelect.value;
     renderPersonaDescription();
 });
+
+// ---------------------------------------------------------------------
+// Attached document (one at a time for now; server accepts a list)
+// ---------------------------------------------------------------------
+
+let attachedDocument = null; // { id, fileName, kind, estimatedPages }
+
+function setAttachStatus(text, isError = false) {
+    attachStatus.textContent = text;
+    attachStatus.className = "attach-status" + (isError ? " error" : "");
+}
+
+function renderAttachedDocument() {
+    if (attachedDocument) {
+        attachedDocName.textContent = attachedDocument.fileName;
+        attachedDocMeta.textContent = `~${attachedDocument.estimatedPages} page${attachedDocument.estimatedPages === 1 ? "" : "s"}`;
+        attachedDoc.hidden = false;
+        attachBtn.textContent = "Replace document";
+    } else {
+        attachedDoc.hidden = true;
+        attachBtn.innerHTML = '<span class="attach-icon" aria-hidden="true">&#128206;</span> Attach document';
+    }
+}
+
+async function uploadDocument(file) {
+    setAttachStatus(`Reading ${file.name}...`);
+    attachBtn.disabled = true;
+    startBtn.disabled = true;
+
+    try {
+        const form = new FormData();
+        form.append("file", file);
+        const res = await fetch("/api/documents", { method: "POST", body: form });
+        const data = await res.json().catch(() => ({}));
+
+        if (!res.ok) {
+            setAttachStatus(data.error ?? `Upload failed (${res.status}).`, true);
+            return;
+        }
+
+        // Replace any previous document (server-side too, tidily)
+        if (attachedDocument) {
+            fetch(`/api/documents/${attachedDocument.id}`, { method: "DELETE" }).catch(() => {});
+        }
+        attachedDocument = data;
+        renderAttachedDocument();
+        setAttachStatus("");
+    } catch (err) {
+        console.error(err);
+        setAttachStatus("Upload failed - see console.", true);
+    } finally {
+        attachBtn.disabled = false;
+        startBtn.disabled = !!peerConnection; // stay disabled only if a call is running
+        fileInput.value = "";
+    }
+}
+
+function removeDocument() {
+    if (!attachedDocument) return;
+    fetch(`/api/documents/${attachedDocument.id}`, { method: "DELETE" }).catch(() => {});
+    attachedDocument = null;
+    renderAttachedDocument();
+    setAttachStatus("");
+}
+
+attachBtn.addEventListener("click", () => fileInput.click());
+fileInput.addEventListener("change", () => {
+    const file = fileInput.files?.[0];
+    if (file) uploadDocument(file);
+});
+removeDocBtn.addEventListener("click", removeDocument);
 
 let peerConnection = null;
 let dataChannel = null;
@@ -185,6 +263,7 @@ function transcriptAsText() {
     const header =
         `AI NativeFactory Voice Chat transcript\n` +
         `Persona: ${p ? p.name : "Unknown"}\n` +
+        (attachedDocument ? `Document: ${attachedDocument.fileName}\n` : "") +
         `Date: ${new Date().toLocaleString()}\n\n`;
     const lines = transcriptEntries
         .filter((e) => e.text.trim().length > 0)
@@ -355,7 +434,10 @@ async function getEphemeralToken() {
     const res = await fetch("/api/session", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ personaId: selectedPersonaId }),
+        body: JSON.stringify({
+            personaId: selectedPersonaId,
+            documentIds: attachedDocument ? [attachedDocument.id] : [],
+        }),
     });
     if (!res.ok) {
         const errText = await res.text();
@@ -417,6 +499,8 @@ function handleServerEvent(evt) {
 async function startConversation() {
     startBtn.disabled = true;
     personaSelect.disabled = true;
+    attachBtn.disabled = true;
+    removeDocBtn.disabled = true;
     setStatus("Requesting microphone access...");
 
     try {
@@ -494,7 +578,7 @@ async function startConversation() {
     const answerSdp = await sdpResponse.text();
     await peerConnection.setRemoteDescription({ type: "answer", sdp: answerSdp });
 
-    setStatus("Connected - start talking");
+    setStatus(attachedDocument ? "Connected - ask about the document" : "Connected - start talking");
     stopBtn.disabled = false;
 }
 
@@ -524,6 +608,8 @@ function cleanup() {
     startBtn.disabled = false;
     stopBtn.disabled = true;
     personaSelect.disabled = false;
+    attachBtn.disabled = false;
+    removeDocBtn.disabled = false;
 }
 
 function stopConversation() {

@@ -25,7 +25,8 @@ any of it, edit that file, commit, and push; Render redeploys.
 |--------------------------|-----------------------------------------|
 | OpenAI API key           | `OPENAI_API_KEY` environment variable   |
 | Model, voice, transcription model | `OpenAiSettings.cs` |
-| Personas (role, guidelines, guardrails) | `Personas/PersonaCatalog.cs` |
+| Personas (role, guidelines, guardrails, document analysis) | `Personas/PersonaCatalog.cs` |
+| Upload limits (page cap, file size) | `UploadLimits` in `Program.cs` |
 
 `appsettings.json` contains only logging defaults and holds no secrets,
 so it's safe to commit.
@@ -46,6 +47,28 @@ shape we'll keep when personas later become editable or stored externally.
 The persona is locked while a conversation is running; end the call to
 switch. The active persona is recorded in the transcript header and in the
 downloaded filename.
+
+## Attaching a document
+
+Before starting a conversation you can attach one file for the persona to
+discuss: PDF, Word (.docx), PowerPoint (.pptx), plain text / Markdown, or
+a source-code or configuration file (C#, TypeScript, Python, SQL, YAML,
+Terraform, etc.). The server extracts the text and holds it in memory for
+the session; nothing is stored anywhere. Documents over roughly 200
+pages (or 15 MB) are rejected with a message rather than truncated.
+
+The full document text is included in the persona's context, so the
+conversation is about the actual document - "what does section 4 say?"
+works. Each persona has a `DocumentAnalysis` section in
+`Personas/PersonaCatalog.cs` describing what it looks for and which kinds
+of file are outside its lane. If the file isn't the persona's area (e.g. a
+Business Analyst given source code) it says so, names the right persona,
+offers to hand over (end, switch persona, start again with the same
+document), and offers what it can from its own perspective.
+
+The server accepts a list of document ids on `/api/session` even though
+the UI attaches one at a time - this is groundwork for a future document
+library where several can be selected.
 
 ## Run locally
 
@@ -73,6 +96,28 @@ shape we'll keep when personas later become editable or stored externally.
 The persona is locked while a conversation is running; end the call to
 switch. The active persona is recorded in the transcript header and in the
 downloaded filename.
+
+## Attaching a document
+
+Before starting a conversation you can attach one file for the persona to
+discuss: PDF, Word (.docx), PowerPoint (.pptx), plain text / Markdown, or
+a source-code or configuration file (C#, TypeScript, Python, SQL, YAML,
+Terraform, etc.). The server extracts the text and holds it in memory for
+the session; nothing is stored anywhere. Documents over roughly 200
+pages (or 15 MB) are rejected with a message rather than truncated.
+
+The full document text is included in the persona's context, so the
+conversation is about the actual document - "what does section 4 say?"
+works. Each persona has a `DocumentAnalysis` section in
+`Personas/PersonaCatalog.cs` describing what it looks for and which kinds
+of file are outside its lane. If the file isn't the persona's area (e.g. a
+Business Analyst given source code) it says so, names the right persona,
+offers to hand over (end, switch persona, start again with the same
+document), and offers what it can from its own perspective.
+
+The server accepts a list of document ids on `/api/session` even though
+the UI attaches one at a time - this is groundwork for a future document
+library where several can be selected.
 
 ## Run locally with Docker
 

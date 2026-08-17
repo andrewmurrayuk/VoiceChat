@@ -12,10 +12,12 @@
         </div>
         <p class="intro">
             Have a spoken, real-time conversation with an AI colleague who takes on a
-            software delivery role. Choose a persona from the list, press <strong>Start</strong>
-            and simply talk &mdash; the AI listens and replies out loud, and a transcript
-            builds up below as you go. Press <strong>End</strong> when you're finished, then
-            use <strong>Copy</strong> or <strong>Download</strong> to keep the transcript.
+            software delivery role. Choose a persona from the list and, if you like,
+            <strong>attach a document</strong> for them to look at &mdash; a PDF, Word or
+            PowerPoint file, or a source-code file. Press <strong>Start</strong> and simply
+            talk; the AI listens and replies out loud, and a transcript builds up below as
+            you go. Press <strong>End</strong> when you're finished, then use
+            <strong>Copy</strong> or <strong>Download</strong> to keep the transcript.
         </p>
     </header>
 
@@ -37,6 +39,20 @@
     </section>
 
     <p id="personaDescription" class="persona-description"></p>
+
+    <section class="attach-bar">
+        <input type="file" id="fileInput" class="visually-hidden"
+               accept=".pdf,.docx,.pptx,.txt,.md,.markdown,.csv,.tsv,.json,.yaml,.yml,.xml,.toml,.ini,.cs,.vb,.fs,.java,.kt,.go,.rs,.c,.h,.cpp,.hpp,.js,.jsx,.ts,.tsx,.py,.rb,.php,.swift,.sql,.sh,.ps1,.html,.css,.razor,.cshtml,.tf,.bicep,.csproj,.sln,.dockerfile" />
+        <button id="attachBtn" class="btn btn-ghost btn-attach" title="Attach a document for the persona to analyse">
+            <span class="attach-icon" aria-hidden="true">&#128206;</span> Attach document
+        </button>
+        <span id="attachStatus" class="attach-status"></span>
+        <span id="attachedDoc" class="attached-doc" hidden>
+            <span id="attachedDocName" class="attached-doc-name"></span>
+            <span id="attachedDocMeta" class="attached-doc-meta"></span>
+            <button id="removeDocBtn" class="attached-doc-remove" title="Remove document" aria-label="Remove document">&times;</button>
+        </span>
+    </section>
 
     <section class="transcript-card">
         <div class="transcript-header">

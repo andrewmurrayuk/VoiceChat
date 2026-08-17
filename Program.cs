@@ -2,6 +2,7 @@ using System.Net.Http.Headers;
 using System.Text.Json;
 using VoiceChat;
 using VoiceChat.Personas;
+using VoiceChat.Documents;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -12,6 +13,14 @@ builder.WebHost.UseUrls($"http://0.0.0.0:{port}");
 
 builder.Services.AddRazorPages();
 builder.Services.AddHttpClient();
+builder.Services.AddSingleton<DocumentStore>();
+
+// Allow uploads up to the configured limit.
+builder.Services.Configure<Microsoft.AspNetCore.Http.Features.FormOptions>(o =>
+{
+    o.MultipartBodyLengthLimit = UploadLimits.MaxFileBytes;
+});
+builder.WebHost.ConfigureKestrel(k => k.Limits.MaxRequestBodySize = UploadLimits.MaxFileBytes);
 
 var app = builder.Build();
 
@@ -38,9 +47,17 @@ app.UseAuthorization();
 // All other configuration (model, voice, instructions, transcription)
 // is baked into OpenAiSettings.cs.
 // -----------------------------------------------------------------------
-app.MapPost("/api/session", async (IHttpClientFactory httpClientFactory, SessionRequest request) =>
+app.MapPost("/api/session", async (IHttpClientFactory httpClientFactory, DocumentStore store, SessionRequest request) =>
 {
     var persona = PersonaCatalog.Get(request.PersonaId);
+
+    // Resolve any attached documents. Accepts a list so the future library
+    // can pass several; the UI currently sends at most one.
+    var documents = (request.DocumentIds ?? Array.Empty<string>())
+        .Select(store.Get)
+        .Where(d => d is not null)
+        .Cast<UploadedDocument>()
+        .ToList();
 
     var apiKey = Environment.GetEnvironmentVariable(OpenAiSettings.ApiKeyEnvVar);
     if (string.IsNullOrWhiteSpace(apiKey))
@@ -66,7 +83,7 @@ app.MapPost("/api/session", async (IHttpClientFactory httpClientFactory, Session
         {
             type = "realtime",
             model = OpenAiSettings.RealtimeModel,
-            instructions = persona.BuildInstructions(),
+            instructions = persona.BuildInstructions(documents),
             audio = audioConfig
         }
     };
@@ -100,9 +117,74 @@ app.MapGet("/api/personas", () => Results.Json(new
     personas = PersonaCatalog.All.Select(p => new { p.Id, p.Name, p.Description })
 }));
 
+// -----------------------------------------------------------------------
+// POST /api/documents  (multipart/form-data, field name "file")
+//
+// Extracts text from the uploaded file and holds it in memory for this
+// browser session. Returns metadata + an id to pass to /api/session.
+// Nothing is persisted; this is a stand-in for the future Azure library.
+// -----------------------------------------------------------------------
+app.MapPost("/api/documents", async (HttpRequest http, DocumentStore store) =>
+{
+    if (!http.HasFormContentType)
+        return Results.BadRequest(new { error = "Expected multipart/form-data with a 'file' field." });
+
+    var form = await http.ReadFormAsync();
+    var file = form.Files.GetFile("file");
+    if (file is null || file.Length == 0)
+        return Results.BadRequest(new { error = "No file was uploaded." });
+
+    if (file.Length > UploadLimits.MaxFileBytes)
+        return Results.BadRequest(new { error = $"File is too large. The limit is {UploadLimits.MaxFileBytes / (1024 * 1024)} MB." });
+
+    if (!DocumentTextExtractor.IsSupported(file.FileName))
+        return Results.BadRequest(new { error = $"'{Path.GetExtension(file.FileName)}' files aren't supported. Upload a PDF, Word (.docx), PowerPoint (.pptx), text/markdown, or a source-code or configuration file." });
+
+    string text;
+    DocumentKind kind;
+    try
+    {
+        await using var stream = file.OpenReadStream();
+        (text, kind) = DocumentTextExtractor.Extract(file.FileName, stream);
+    }
+    catch (Exception ex)
+    {
+        return Results.BadRequest(new { error = $"Couldn't read that file: {ex.Message}" });
+    }
+
+    if (string.IsNullOrWhiteSpace(text))
+        return Results.BadRequest(new { error = "No readable text was found in that file. If it's a scanned PDF, it would need OCR first." });
+
+    var tokens = DocumentTextExtractor.EstimateTokens(text);
+    var pages = DocumentTextExtractor.EstimatePages(tokens);
+    if (pages > UploadLimits.MaxPages)
+        return Results.BadRequest(new { error = $"That document is roughly {pages} pages, which is over the {UploadLimits.MaxPages}-page limit for a voice conversation. Please split it or upload the section you want to discuss." });
+
+    var doc = store.Add(file.FileName, kind, text);
+
+    return Results.Json(new
+    {
+        id = doc.Id,
+        fileName = doc.FileName,
+        kind = doc.Kind.ToString(),
+        estimatedPages = doc.EstimatedPages,
+        estimatedTokens = doc.EstimatedTokens
+    });
+});
+
+app.MapDelete("/api/documents/{id}", (string id, DocumentStore store) =>
+    store.Remove(id) ? Results.NoContent() : Results.NotFound());
+
 app.MapRazorPages();
 
 app.Run();
 
 /// <summary>Body of POST /api/session.</summary>
-public sealed record SessionRequest(string? PersonaId);
+public sealed record SessionRequest(string? PersonaId, string[]? DocumentIds);
+
+/// <summary>Upload limits. "200 pages" is expressed via a page estimate of ~500 tokens/page.</summary>
+public static class UploadLimits
+{
+    public const long MaxFileBytes = 15 * 1024 * 1024; // 15 MB raw file
+    public const int MaxPages = 200;                    // ~100k tokens of extracted text
+}
