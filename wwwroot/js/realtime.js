@@ -182,14 +182,28 @@ function setStatus(text) {
     statusEl.textContent = text;
 }
 
+let currentSpeakerMode = null;
+
 function setSpeaker(mode) {
     // mode: "idle" | "listening" | "you" | "ai"
-    speakerLabel.className = "speaker-label " + mode;
+    // Only touch the DOM when the value changes - this runs every
+    // animation frame, and rewriting the label each frame forces a
+    // layout pass 60 times a second.
+    if (mode === currentSpeakerMode) return;
+    currentSpeakerMode = mode;
+    speakerLabel.className = "pill " + mode;
     speakerLabel.textContent =
         mode === "you" ? "You" :
         mode === "ai" ? "AI" :
         mode === "listening" ? "Listening" :
         "Idle";
+}
+
+// Scroll the transcript to the bottom - but only if the user was already
+// at (or near) the bottom, so reading back through history isn't hijacked.
+function scrollTranscriptToBottom() {
+    const nearBottom = transcriptEl.scrollHeight - transcriptEl.scrollTop - transcriptEl.clientHeight < 80;
+    if (nearBottom) transcriptEl.scrollTop = transcriptEl.scrollHeight;
 }
 
 function clearPlaceholder() {
@@ -225,7 +239,7 @@ function addLine(role, text) {
     div.appendChild(speaker);
     div.appendChild(body);
     transcriptEl.appendChild(div);
-    transcriptEl.scrollTop = transcriptEl.scrollHeight;
+    transcriptEl.scrollTop = transcriptEl.scrollHeight; // new line: always show it
 
     // Return both so the AI streaming path can keep the entry in sync.
     return { body, entry };
@@ -241,7 +255,7 @@ function appendToAiLine(delta) {
     }
     currentAiLine.textContent += delta;
     if (currentAiEntry) currentAiEntry.text += delta;
-    transcriptEl.scrollTop = transcriptEl.scrollHeight;
+    scrollTranscriptToBottom();
 }
 
 // ---------------------------------------------------------------------

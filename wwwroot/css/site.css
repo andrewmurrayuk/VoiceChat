@@ -21,6 +21,10 @@
 
 html, body { height: 100%; }
 
+/* Stop the browser re-anchoring the window scroll position as the
+   transcript streams in - this is what makes the whole page jump. */
+html { overflow-anchor: none; }
+
 body {
     margin: 0;
     font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
