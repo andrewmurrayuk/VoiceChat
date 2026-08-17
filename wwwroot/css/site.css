@@ -156,6 +156,9 @@ body {
     padding: 3px 10px;
     border-radius: 999px;
     white-space: nowrap;
+    min-width: 76px;         /* fixed width so label changes don't shift the toolbar */
+    text-align: center;
+    display: inline-block;
     transition: background 0.15s, color 0.15s;
 }
 
@@ -173,8 +176,7 @@ body {
     box-shadow: var(--shadow);
     display: flex;
     flex-direction: column;
-    flex: 1;
-    min-height: 420px;
+    flex: 0 0 auto;          /* fixed size - never grows with content */
     overflow: hidden;
 }
 
@@ -202,10 +204,11 @@ body {
 .transcript {
     padding: 18px 20px;
     overflow-y: auto;
-    flex: 1;
-    max-height: 60vh;
+    height: 480px;           /* fixed height so streaming text scrolls
+                                inside the box instead of resizing it */
     line-height: 1.6;
     font-size: 14.5px;
+    overflow-anchor: none;   /* we manage scroll position ourselves */
 }
 
 .transcript-placeholder {
