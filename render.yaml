@@ -1,0 +1,14 @@
+# Render Blueprint - lets Render create the service from this file.
+# In the Render dashboard: New + -> Blueprint -> pick the repo.
+services:
+  - type: web
+    name: voicechat
+    runtime: docker
+    plan: free
+    region: frankfurt
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /
+    autoDeploy: true
+    envVars:
+      - key: OPENAI_API_KEY
+        sync: false   # set this manually in the dashboard; never in the repo

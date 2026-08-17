@@ -1,0 +1,44 @@
+@page
+@model VoiceChat.Pages.IndexModel
+
+<div class="app">
+    <header class="app-header">
+        <div class="brand">
+            <span class="brand-mark"></span>
+            <span class="brand-name">Voice Chat</span>
+        </div>
+    </header>
+
+    <section class="toolbar">
+        <div class="toolbar-left">
+            <button id="startBtn" class="btn btn-primary">Start</button>
+            <button id="stopBtn" class="btn btn-secondary" disabled>End</button>
+        </div>
+
+        <div class="toolbar-right">
+            <canvas id="visualizer" width="240" height="56" class="wave" aria-hidden="true"></canvas>
+            <span id="speakerLabel" class="pill idle">Idle</span>
+            <span id="status" class="status">Ready</span>
+        </div>
+    </section>
+
+    <section class="transcript-card">
+        <div class="transcript-header">
+            <span class="transcript-title">Transcript</span>
+            <div class="transcript-actions">
+                <button id="copyBtn" class="btn btn-ghost" disabled title="Copy transcript to clipboard">Copy</button>
+                <button id="downloadBtn" class="btn btn-ghost" disabled title="Download transcript as a text file">Download</button>
+                <button id="clearBtn" class="btn btn-ghost" disabled title="Clear the transcript">Clear</button>
+            </div>
+        </div>
+        <div id="transcript" class="transcript">
+            <div class="transcript-placeholder">Your conversation will appear here.</div>
+        </div>
+    </section>
+
+    <audio id="remoteAudio" autoplay playsinline></audio>
+</div>
+
+@section Scripts {
+    <script src="~/js/realtime.js" asp-append-version="true"></script>
+}

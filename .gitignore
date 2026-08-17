@@ -1,0 +1,19 @@
+# .NET
+bin/
+obj/
+*.user
+*.suo
+.vs/
+.vscode/
+
+# Local secrets - never commit
+.env
+appsettings.Development.json
+appsettings.*.local.json
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Packaging
+*.zip
