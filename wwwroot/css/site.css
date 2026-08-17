@@ -371,6 +371,11 @@ body {
     font-size: 13px;
 }
 
+/* The hidden attribute must beat the display rule above */
+.attached-doc[hidden] {
+    display: none;
+}
+
 .attached-doc-name {
     font-weight: 500;
     color: var(--text);
