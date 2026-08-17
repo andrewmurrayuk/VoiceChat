@@ -219,13 +219,19 @@ function updateActionButtons() {
     clearBtn.disabled = !has;
 }
 
-function addLine(role, text) {
+// Lines keyed by the API's item_id so that text arriving late (your
+// transcription regularly lands after the AI has started replying) is
+// slotted into the right place rather than appended out of order.
+const linesByItem = new Map();
+
+function addLine(role, text, itemId = null, pending = false) {
     clearPlaceholder();
     const entry = { role, text, time: new Date() };
     transcriptEntries.push(entry);
     updateActionButtons();
 
     const div = document.createElement("div");
+    if (pending) div.classList.add("pending");
     div.className = "line " + (role === "you" ? "you" : "ai");
 
     const speaker = document.createElement("span");
@@ -241,17 +247,33 @@ function addLine(role, text) {
     transcriptEl.appendChild(div);
     transcriptEl.scrollTop = transcriptEl.scrollHeight; // new line: always show it
 
-    // Return both so the AI streaming path can keep the entry in sync.
-    return { body, entry };
+    const handle = { div, body, entry };
+    if (itemId) linesByItem.set(itemId, handle);
+    return handle;
+}
+
+// Fill in (or create) the user's line for a given item.
+function setUserLine(itemId, text) {
+    const existing = itemId ? linesByItem.get(itemId) : null;
+    if (existing) {
+        existing.body.textContent = text;
+        existing.entry.text = text;
+        existing.div.classList.remove("pending");
+    } else {
+        addLine("you", text, itemId);
+    }
+    scrollTranscriptToBottom();
 }
 
 let currentAiEntry = null;
+let currentAiItemId = null;
 
-function appendToAiLine(delta) {
-    if (!currentAiLine) {
-        const created = addLine("ai", "");
+function appendToAiLine(delta, itemId = null) {
+    if (!currentAiLine || (itemId && itemId !== currentAiItemId)) {
+        const created = addLine("ai", "", itemId);
         currentAiLine = created.body;
         currentAiEntry = created.entry;
+        currentAiItemId = itemId;
     }
     currentAiLine.textContent += delta;
     if (currentAiEntry) currentAiEntry.text += delta;
@@ -280,7 +302,7 @@ function transcriptAsText() {
         (attachedDocument ? `Document: ${attachedDocument.fileName}\n` : "") +
         `Date: ${new Date().toLocaleString()}\n\n`;
     const lines = transcriptEntries
-        .filter((e) => e.text.trim().length > 0)
+        .filter((e) => e.text.trim().length > 0 && e.text.trim() !== "…")
         .map((e) => `[${formatTime(e.time)}] ${e.role === "you" ? "You" : "AI"}: ${e.text.trim()}`);
     return header + lines.join("\n") + "\n";
 }
@@ -312,8 +334,10 @@ function downloadTranscript() {
 
 function clearTranscript() {
     transcriptEntries.length = 0;
+    linesByItem.clear();
     currentAiLine = null;
     currentAiEntry = null;
+    currentAiItemId = null;
     transcriptEl.innerHTML = '<div class="transcript-placeholder">Your conversation will appear here.</div>';
     placeholderCleared = false;
     updateActionButtons();
@@ -483,19 +507,33 @@ function handleServerEvent(evt) {
         // handled too in case of an older model).
         case "response.output_audio_transcript.delta":
         case "response.audio_transcript.delta":
-            appendToAiLine(msg.delta ?? "");
+            appendToAiLine(msg.delta ?? "", msg.item_id ?? null);
             break;
 
         case "response.output_audio_transcript.done":
         case "response.audio_transcript.done":
             currentAiLine = null;
             currentAiEntry = null;
+            currentAiItemId = null;
             break;
 
-        // Your own speech, transcribed (requires input transcription enabled
-        // via session.update below).
+        // Your turn has ended: reserve its place in the transcript NOW, with a
+        // placeholder, so the line sits in the right order even though the
+        // transcription text itself arrives a moment later (often after the
+        // AI has already started replying).
+        case "input_audio_buffer.committed":
+            if (msg.item_id && !linesByItem.has(msg.item_id)) {
+                addLine("you", "…", msg.item_id, true);
+            }
+            break;
+
+        // Your speech, transcribed. Slot it into the reserved line.
         case "conversation.item.input_audio_transcription.completed":
-            addLine("you", msg.transcript ?? "");
+            setUserLine(msg.item_id ?? null, msg.transcript ?? "");
+            break;
+
+        case "conversation.item.input_audio_transcription.failed":
+            setUserLine(msg.item_id ?? null, "[transcription unavailable]");
             break;
 
         case "error":
@@ -612,6 +650,7 @@ function cleanup() {
     remoteAudio.srcObject = null;
     currentAiLine = null;
     currentAiEntry = null;
+    currentAiItemId = null;
     micAnalyser = null;
     aiAnalyser = null;
     micData = null;

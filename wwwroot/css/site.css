@@ -430,3 +430,9 @@ body {
     opacity: 0.35;
     cursor: not-allowed;
 }
+
+/* Placeholder while your words are still being transcribed */
+.transcript .line.pending .body {
+    color: var(--text-muted);
+    letter-spacing: 0.15em;
+}
