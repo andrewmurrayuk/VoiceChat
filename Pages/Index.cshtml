@@ -1,16 +1,30 @@
 @page
 @model VoiceChat.Pages.IndexModel
+@{
+    ViewData["Title"] = "AI NativeFactory Voice Chat";
+}
 
 <div class="app">
     <header class="app-header">
         <div class="brand">
             <span class="brand-mark"></span>
-            <span class="brand-name">Voice Chat</span>
+            <h1 class="brand-name">AI NativeFactory Voice Chat</h1>
         </div>
+        <p class="intro">
+            Have a spoken, real-time conversation with an AI colleague who takes on a
+            software delivery role. Choose a persona from the list, press <strong>Start</strong>
+            and simply talk &mdash; the AI listens and replies out loud, and a transcript
+            builds up below as you go. Press <strong>End</strong> when you're finished, then
+            use <strong>Copy</strong> or <strong>Download</strong> to keep the transcript.
+        </p>
     </header>
 
     <section class="toolbar">
         <div class="toolbar-left">
+            <label class="persona-select">
+                <span class="persona-select-label">Persona</span>
+                <select id="personaSelect" aria-label="Choose a persona"></select>
+            </label>
             <button id="startBtn" class="btn btn-primary">Start</button>
             <button id="stopBtn" class="btn btn-secondary" disabled>End</button>
         </div>
@@ -21,6 +35,8 @@
             <span id="status" class="status">Ready</span>
         </div>
     </section>
+
+    <p id="personaDescription" class="persona-description"></p>
 
     <section class="transcript-card">
         <div class="transcript-header">

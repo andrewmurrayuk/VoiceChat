@@ -1,6 +1,7 @@
 using System.Net.Http.Headers;
 using System.Text.Json;
 using VoiceChat;
+using VoiceChat.Personas;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -37,8 +38,10 @@ app.UseAuthorization();
 // All other configuration (model, voice, instructions, transcription)
 // is baked into OpenAiSettings.cs.
 // -----------------------------------------------------------------------
-app.MapPost("/api/session", async (IHttpClientFactory httpClientFactory) =>
+app.MapPost("/api/session", async (IHttpClientFactory httpClientFactory, SessionRequest request) =>
 {
+    var persona = PersonaCatalog.Get(request.PersonaId);
+
     var apiKey = Environment.GetEnvironmentVariable(OpenAiSettings.ApiKeyEnvVar);
     if (string.IsNullOrWhiteSpace(apiKey))
     {
@@ -63,7 +66,7 @@ app.MapPost("/api/session", async (IHttpClientFactory httpClientFactory) =>
         {
             type = "realtime",
             model = OpenAiSettings.RealtimeModel,
-            instructions = OpenAiSettings.Instructions,
+            instructions = persona.BuildInstructions(),
             audio = audioConfig
         }
     };
@@ -89,6 +92,17 @@ app.MapPost("/api/session", async (IHttpClientFactory httpClientFactory) =>
 // hard-code it separately (it's needed as a query param on the SDP call).
 app.MapGet("/api/config", () => Results.Json(new { model = OpenAiSettings.RealtimeModel }));
 
+// List of selectable personas for the dropdown. Only the display fields
+// are sent - the prompt text stays server-side.
+app.MapGet("/api/personas", () => Results.Json(new
+{
+    defaultId = PersonaCatalog.DefaultPersonaId,
+    personas = PersonaCatalog.All.Select(p => new { p.Id, p.Name, p.Description })
+}));
+
 app.MapRazorPages();
 
 app.Run();
+
+/// <summary>Body of POST /api/session.</summary>
+public sealed record SessionRequest(string? PersonaId);

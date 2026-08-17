@@ -24,6 +24,8 @@ const speakerLabel = document.getElementById("speakerLabel");
 const copyBtn = document.getElementById("copyBtn");
 const downloadBtn = document.getElementById("downloadBtn");
 const clearBtn = document.getElementById("clearBtn");
+const personaSelect = document.getElementById("personaSelect");
+const personaDescription = document.getElementById("personaDescription");
 const ctx2d = canvas.getContext("2d");
 
 // Model name is served from /api/config so it lives in one place
@@ -33,6 +35,48 @@ fetch("/api/config")
     .then((r) => r.json())
     .then((c) => { if (c?.model) MODEL = c.model; })
     .catch(() => { /* fall back to default above */ });
+
+// ---------------------------------------------------------------------
+// Personas
+// ---------------------------------------------------------------------
+
+let personas = [];
+let selectedPersonaId = null;
+
+function currentPersona() {
+    return personas.find((p) => p.id === selectedPersonaId) ?? null;
+}
+
+function renderPersonaDescription() {
+    const p = currentPersona();
+    personaDescription.textContent = p ? p.description : "";
+}
+
+async function loadPersonas() {
+    try {
+        const res = await fetch("/api/personas");
+        const data = await res.json();
+        personas = data.personas ?? [];
+        personaSelect.innerHTML = "";
+        for (const p of personas) {
+            const opt = document.createElement("option");
+            opt.value = p.id;
+            opt.textContent = p.name;
+            personaSelect.appendChild(opt);
+        }
+        selectedPersonaId = data.defaultId ?? (personas[0]?.id ?? null);
+        if (selectedPersonaId) personaSelect.value = selectedPersonaId;
+        renderPersonaDescription();
+    } catch (err) {
+        console.error("Failed to load personas:", err);
+        personaDescription.textContent = "Could not load personas.";
+    }
+}
+
+personaSelect.addEventListener("change", () => {
+    selectedPersonaId = personaSelect.value;
+    renderPersonaDescription();
+});
 
 let peerConnection = null;
 let dataChannel = null;
@@ -137,7 +181,11 @@ function formatFileStamp(d) {
 }
 
 function transcriptAsText() {
-    const header = `Voice Chat transcript - ${new Date().toLocaleString()}\n\n`;
+    const p = currentPersona();
+    const header =
+        `AI NativeFactory Voice Chat transcript\n` +
+        `Persona: ${p ? p.name : "Unknown"}\n` +
+        `Date: ${new Date().toLocaleString()}\n\n`;
     const lines = transcriptEntries
         .filter((e) => e.text.trim().length > 0)
         .map((e) => `[${formatTime(e.time)}] ${e.role === "you" ? "You" : "AI"}: ${e.text.trim()}`);
@@ -161,7 +209,8 @@ function downloadTranscript() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `voice-chat-${formatFileStamp(new Date())}.txt`;
+    const slug = selectedPersonaId ?? "chat";
+    a.download = `voice-chat-${slug}-${formatFileStamp(new Date())}.txt`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -303,7 +352,11 @@ function stopVisualizer() {
 // ---------------------------------------------------------------------
 
 async function getEphemeralToken() {
-    const res = await fetch("/api/session", { method: "POST" });
+    const res = await fetch("/api/session", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ personaId: selectedPersonaId }),
+    });
     if (!res.ok) {
         const errText = await res.text();
         throw new Error("Failed to get session token: " + errText);
@@ -363,6 +416,7 @@ function handleServerEvent(evt) {
 
 async function startConversation() {
     startBtn.disabled = true;
+    personaSelect.disabled = true;
     setStatus("Requesting microphone access...");
 
     try {
@@ -469,6 +523,7 @@ function cleanup() {
     setSpeaker("idle");
     startBtn.disabled = false;
     stopBtn.disabled = true;
+    personaSelect.disabled = false;
 }
 
 function stopConversation() {
@@ -482,5 +537,6 @@ copyBtn.addEventListener("click", copyTranscript);
 downloadBtn.addEventListener("click", downloadTranscript);
 clearBtn.addEventListener("click", clearTranscript);
 
-// Draw the resting state on first load
+// Initial state
 stopVisualizer();
+loadPersonas();

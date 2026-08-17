@@ -1,8 +1,8 @@
-# Voice Chat (OpenAI Realtime API)
+# AI NativeFactory Voice Chat
 
-A minimal ASP.NET Core 8 Razor Pages app for a live, spoken, streaming
-conversation with an OpenAI model in your browser. Deployable to Render
-via Docker, auto-deployed from GitHub.
+An ASP.NET Core 8 Razor Pages app for a live, spoken, streaming
+conversation with an AI colleague who takes on a software-delivery
+persona. Deployable to Render via Docker, auto-deployed from GitHub.
 
 ## How it works
 
@@ -24,10 +24,28 @@ any of it, edit that file, commit, and push; Render redeploys.
 | What                     | Where                                   |
 |--------------------------|-----------------------------------------|
 | OpenAI API key           | `OPENAI_API_KEY` environment variable   |
-| Model, voice, instructions, transcription model | `OpenAiSettings.cs` |
+| Model, voice, transcription model | `OpenAiSettings.cs` |
+| Personas (role, guidelines, guardrails) | `Personas/PersonaCatalog.cs` |
 
 `appsettings.json` contains only logging defaults and holds no secrets,
 so it's safe to commit.
+
+## Personas
+
+Four built-in personas, selectable from the dropdown before starting a
+conversation: **Solution Architect** (default), **Lead Developer**,
+**User-Centred Design Lead**, and **Business Analyst**.
+
+Each persona is defined in `Personas/PersonaCatalog.cs` with three
+separate sections - `Role`, `Guidelines`, and `Guardrails` - which are
+assembled into the system prompt along with a shared `Common` block that
+holds the voice/accent and general-conduct instructions. Keeping the
+sections separate makes them easy to tune independently, and is the
+shape we'll keep when personas later become editable or stored externally.
+
+The persona is locked while a conversation is running; end the call to
+switch. The active persona is recorded in the transcript header and in the
+downloaded filename.
 
 ## Run locally
 
@@ -38,6 +56,23 @@ dotnet run
 
 Then open http://localhost:8080, click **Start**, allow the microphone,
 and talk. Chrome/Edge recommended.
+
+## Personas
+
+Four built-in personas, selectable from the dropdown before starting a
+conversation: **Solution Architect** (default), **Lead Developer**,
+**User-Centred Design Lead**, and **Business Analyst**.
+
+Each persona is defined in `Personas/PersonaCatalog.cs` with three
+separate sections - `Role`, `Guidelines`, and `Guardrails` - which are
+assembled into the system prompt along with a shared `Common` block that
+holds the voice/accent and general-conduct instructions. Keeping the
+sections separate makes them easy to tune independently, and is the
+shape we'll keep when personas later become editable or stored externally.
+
+The persona is locked while a conversation is running; end the call to
+switch. The active persona is recorded in the transcript header and in the
+downloaded filename.
 
 ## Run locally with Docker
 
@@ -66,7 +101,7 @@ edge and forwards plain HTTP to the container.
   sessions against your API key, and Realtime is billed per minute of
   audio. Fine for a personal tool; add an access gate before sharing it.
 - **Accent.** OpenAI has no British voice. The accent comes from the
-  instructions in `OpenAiSettings.cs`. It's good but not perfectly
+  `Common` instructions in `Personas/PersonaCatalog.cs`. It's good but not perfectly
   consistent; strengthen the wording if it drifts. `marin`, `sage` and
   `coral` tend to hold it best.
 - **Disable user-side transcription** by setting `TranscriptionModel` to
