@@ -84,7 +84,7 @@ body {
     border-radius: var(--radius);
     padding: 10px 14px;
     box-shadow: var(--shadow-sm);
-    flex-wrap: wrap;
+    flex-wrap: nowrap;       /* keep on one row; status truncates instead */
 }
 
 .toolbar-left,
@@ -92,6 +92,14 @@ body {
     display: flex;
     align-items: center;
     gap: 10px;
+}
+
+.toolbar-left { flex: 0 0 auto; }
+
+.toolbar-right {
+    flex: 1 1 auto;
+    min-width: 0;            /* allow the status text inside to shrink */
+    justify-content: flex-end;
 }
 
 .wave {
@@ -103,7 +111,12 @@ body {
 .status {
     font-size: 13px;
     color: var(--text-muted);
-    min-width: 120px;
+    flex: 0 1 auto;
+    min-width: 0;
+    max-width: 260px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
     text-align: right;
 }
 
@@ -245,8 +258,9 @@ body {
 }
 
 @media (max-width: 600px) {
+    .toolbar { flex-wrap: wrap; }
     .toolbar-right { width: 100%; justify-content: space-between; }
-    .status { min-width: 0; }
+    .status { max-width: none; }
 }
 
 /* ---------- Header copy ---------- */

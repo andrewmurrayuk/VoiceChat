@@ -515,7 +515,7 @@ async function startConversation() {
     personaSelect.disabled = true;
     attachBtn.disabled = true;
     removeDocBtn.disabled = true;
-    setStatus("Requesting microphone access...");
+    setStatus("Requesting microphone...");
 
     try {
         localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -532,7 +532,7 @@ async function startConversation() {
     startVisualizer();
     setSpeaker("listening");
 
-    setStatus("Getting session token...");
+    setStatus("Connecting...");
     let ephemeralToken;
     try {
         ephemeralToken = await getEphemeralToken();
@@ -592,7 +592,7 @@ async function startConversation() {
     const answerSdp = await sdpResponse.text();
     await peerConnection.setRemoteDescription({ type: "answer", sdp: answerSdp });
 
-    setStatus(attachedDocument ? "Connected - ask about the document" : "Connected - start talking");
+    setStatus("Connected");
     stopBtn.disabled = false;
 }
 
